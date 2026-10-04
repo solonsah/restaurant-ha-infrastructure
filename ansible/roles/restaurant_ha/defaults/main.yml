@@ -1,0 +1,52 @@
+---
+restaurant_ha_supported_distributions:
+  - RedHat
+
+restaurant_ha_supported_major_versions:
+  - "8"
+  - "9"
+
+restaurant_ha_change_approved: false
+restaurant_ha_recovery_access_confirmed: false
+restaurant_ha_backup_confirmed: false
+
+restaurant_ha_rollback_requested: false
+restaurant_ha_rollback_approved: false
+restaurant_ha_rollback_component: ""
+restaurant_ha_rollback_source: ""
+
+restaurant_ha_manage_haproxy: false
+restaurant_ha_manage_httpd: false
+restaurant_ha_manage_nfs_client: false
+restaurant_ha_validate_mariadb: false
+restaurant_ha_manage_monitoring: false
+restaurant_ha_manage_firewalld: false
+
+restaurant_ha_haproxy_package: haproxy
+restaurant_ha_haproxy_service: haproxy
+restaurant_ha_haproxy_config_path: /etc/haproxy/haproxy.cfg
+
+restaurant_ha_httpd_package: httpd
+restaurant_ha_httpd_service: httpd
+restaurant_ha_httpd_config_path: /etc/httpd/conf.d/restaurant-ha.conf
+restaurant_ha_http_port: 80
+restaurant_ha_https_port: 443
+restaurant_ha_health_path: /healthz
+restaurant_ha_document_root: /var/www/restaurant
+
+restaurant_ha_nfs_package: nfs-utils
+restaurant_ha_nfs_source: 198.51.100.10:/srv/restaurant
+restaurant_ha_nfs_mount_path: /srv/restaurant/shared
+restaurant_ha_nfs_mount_options: rw,nosuid,nodev,_netdev
+
+restaurant_ha_mariadb_host: 203.0.113.10
+restaurant_ha_mariadb_port: 3306
+
+restaurant_ha_node_exporter_port: 9100
+restaurant_ha_prometheus_port: 9090
+restaurant_ha_prometheus_service: prometheus
+restaurant_ha_prometheus_config_path: /etc/prometheus/prometheus.yml
+restaurant_ha_prometheus_file_sd_dir: /etc/prometheus/file_sd
+restaurant_ha_prometheus_target_path: /etc/prometheus/file_sd/restaurant-ha.yml
+
+restaurant_ha_backup_root: /var/backups/restaurant-ha

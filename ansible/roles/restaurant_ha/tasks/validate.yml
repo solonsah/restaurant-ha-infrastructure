@@ -1,0 +1,69 @@
+---
+- name: Refresh service facts for post-change validation
+  ansible.builtin.service_facts:
+
+- name: Verify HAProxy is running
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.services[restaurant_ha_haproxy_service + ".service"].state == "running"
+    fail_msg: HAProxy is not running after configuration.
+  when:
+    - restaurant_ha_manage_haproxy | bool
+    - inventory_hostname in groups.get("load_balancers", [])
+
+- name: Verify Apache HTTPD is running
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.services[restaurant_ha_httpd_service + ".service"].state == "running"
+    fail_msg: Apache HTTPD is not running after configuration.
+  when:
+    - restaurant_ha_manage_httpd | bool
+    - inventory_hostname in groups.get("web_servers", [])
+
+- name: Verify local HTTP health endpoint
+  ansible.builtin.uri:
+    url: >-
+      http://127.0.0.1:{{ restaurant_ha_http_port }}{{ restaurant_ha_health_path }}
+    method: GET
+    status_code: 200
+    return_content: false
+  changed_when: false
+  when:
+    - restaurant_ha_manage_httpd | bool
+    - inventory_hostname in groups.get("web_servers", [])
+
+- name: Verify shared NFS mount
+  ansible.builtin.command:
+    cmd: findmnt --mountpoint {{ restaurant_ha_nfs_mount_path }}
+  changed_when: false
+  when:
+    - restaurant_ha_manage_nfs_client | bool
+    - inventory_hostname in groups.get("web_servers", [])
+
+- name: Verify MariaDB network reachability
+  ansible.builtin.wait_for:
+    host: "{{ restaurant_ha_mariadb_host }}"
+    port: "{{ restaurant_ha_mariadb_port }}"
+    state: started
+    timeout: 5
+  changed_when: false
+  when:
+    - restaurant_ha_validate_mariadb | bool
+    - inventory_hostname in groups.get("web_servers", [])
+
+- name: Verify Prometheus target file exists
+  ansible.builtin.stat:
+    path: "{{ restaurant_ha_prometheus_target_path }}"
+  register: restaurant_ha_prometheus_target_validation
+  when:
+    - restaurant_ha_manage_monitoring | bool
+    - inventory_hostname in groups.get("monitoring_servers", [])
+
+- name: Confirm Prometheus target file was deployed
+  ansible.builtin.assert:
+    that:
+      - restaurant_ha_prometheus_target_validation.stat.exists
+    fail_msg: Prometheus file-discovery target file is missing.
+  when:
+    - restaurant_ha_manage_monitoring | bool
+    - inventory_hostname in groups.get("monitoring_servers", [])

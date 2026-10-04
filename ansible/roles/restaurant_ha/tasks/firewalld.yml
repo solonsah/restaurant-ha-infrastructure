@@ -1,0 +1,23 @@
+---
+- name: Gather current service state before firewall changes
+  ansible.builtin.service_facts:
+
+- name: Require an existing active firewalld service
+  ansible.builtin.assert:
+    that:
+      - "'firewalld.service' in ansible_facts.services"
+      - ansible_facts.services["firewalld.service"].state == "running"
+    fail_msg: >-
+      Firewalld must already be installed, configured and running.
+      This role will not start a firewall on an unreviewed host.
+
+- name: Allow application HTTP traffic on load balancers and web servers
+  ansible.posix.firewalld:
+    zone: public
+    port: "{{ restaurant_ha_http_port }}/tcp"
+    permanent: true
+    immediate: true
+    state: enabled
+  when: >-
+    inventory_hostname in groups.get("load_balancers", [])
+    or inventory_hostname in groups.get("web_servers", [])

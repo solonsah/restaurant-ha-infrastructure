@@ -1,0 +1,79 @@
+---
+- name: Validate rollback request
+  ansible.builtin.assert:
+    that:
+      - restaurant_ha_rollback_requested | bool
+      - restaurant_ha_rollback_approved | bool
+      - restaurant_ha_rollback_component in ["haproxy", "httpd", "prometheus"]
+      - restaurant_ha_rollback_source | length > 0
+      - restaurant_ha_rollback_source.startswith(restaurant_ha_backup_root + "/")
+    fail_msg: >-
+      Rollback requires explicit approval, a supported component and an exact
+      backup file beneath the protected restaurant-ha backup directory.
+
+- name: Map rollback component to managed destination
+  ansible.builtin.set_fact:
+    restaurant_ha_rollback_destination: >-
+      {{
+        {
+          "haproxy": restaurant_ha_haproxy_config_path,
+          "httpd": restaurant_ha_httpd_config_path,
+          "prometheus": restaurant_ha_prometheus_target_path
+        }[restaurant_ha_rollback_component]
+      }}
+
+- name: Inspect requested rollback source
+  ansible.builtin.stat:
+    path: "{{ restaurant_ha_rollback_source }}"
+  register: restaurant_ha_rollback_source_file
+
+- name: Require an existing regular backup file
+  ansible.builtin.assert:
+    that:
+      - restaurant_ha_rollback_source_file.stat.exists
+      - restaurant_ha_rollback_source_file.stat.isreg
+    fail_msg: The requested rollback source is missing or is not a regular file.
+
+- name: Restore selected configuration from exact backup
+  ansible.builtin.copy:
+    src: "{{ restaurant_ha_rollback_source }}"
+    dest: "{{ restaurant_ha_rollback_destination }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0640"
+    backup: true
+
+- name: Validate restored HAProxy configuration
+  ansible.builtin.command:
+    cmd: >-
+      /usr/sbin/haproxy -c
+      -f {{ restaurant_ha_haproxy_config_path }}
+  changed_when: false
+  when: restaurant_ha_rollback_component == "haproxy"
+
+- name: Validate restored HTTPD configuration
+  ansible.builtin.command:
+    cmd: httpd -t
+  changed_when: false
+  when: restaurant_ha_rollback_component == "httpd"
+
+- name: Validate restored Prometheus configuration
+  ansible.builtin.command:
+    cmd: >-
+      /usr/bin/promtool check config
+      {{ restaurant_ha_prometheus_config_path }}
+  changed_when: false
+  when: restaurant_ha_rollback_component == "prometheus"
+
+- name: Reload restored service
+  ansible.builtin.service:
+    name: >-
+      {{
+        {
+          "haproxy": restaurant_ha_haproxy_service,
+          "httpd": restaurant_ha_httpd_service,
+          "prometheus": restaurant_ha_prometheus_service
+        }[restaurant_ha_rollback_component]
+      }}
+    state: reloaded

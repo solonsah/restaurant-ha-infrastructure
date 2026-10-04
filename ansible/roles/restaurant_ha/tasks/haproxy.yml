@@ -1,0 +1,53 @@
+---
+- name: Confirm HAProxy tasks are running only on load balancers
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname in groups.get("load_balancers", [])
+    fail_msg: HAProxy management is restricted to the load_balancers inventory group.
+
+- name: Install HAProxy package
+  ansible.builtin.package:
+    name: "{{ restaurant_ha_haproxy_package }}"
+    state: present
+
+- name: Create protected HAProxy backup directory
+  ansible.builtin.file:
+    path: "{{ restaurant_ha_backup_root }}/haproxy"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Inspect existing HAProxy configuration
+  ansible.builtin.stat:
+    path: "{{ restaurant_ha_haproxy_config_path }}"
+  register: restaurant_ha_existing_haproxy_config
+
+- name: Back up existing HAProxy configuration
+  ansible.builtin.copy:
+    src: "{{ restaurant_ha_haproxy_config_path }}"
+    dest: >-
+      {{ restaurant_ha_backup_root }}/haproxy/haproxy.cfg.{{
+        ansible_date_time.iso8601_basic_short
+      }}
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0600"
+  when: restaurant_ha_existing_haproxy_config.stat.exists
+
+- name: Deploy validated HAProxy configuration
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: "{{ restaurant_ha_haproxy_config_path }}"
+    owner: root
+    group: root
+    mode: "0640"
+    validate: /usr/sbin/haproxy -c -f %s
+  notify: Reload HAProxy safely
+
+- name: Enable and start HAProxy service
+  ansible.builtin.service:
+    name: "{{ restaurant_ha_haproxy_service }}"
+    enabled: true
+    state: started

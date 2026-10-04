@@ -1,0 +1,77 @@
+---
+- name: Confirm monitoring tasks are running only on monitoring servers
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname in groups.get("monitoring_servers", [])
+    fail_msg: Prometheus configuration is restricted to the monitoring_servers group.
+
+- name: Gather monitoring service state
+  ansible.builtin.service_facts:
+
+- name: Inspect Prometheus validation utility
+  ansible.builtin.stat:
+    path: /usr/bin/promtool
+  register: restaurant_ha_promtool
+
+- name: Inspect main Prometheus configuration
+  ansible.builtin.stat:
+    path: "{{ restaurant_ha_prometheus_config_path }}"
+  register: restaurant_ha_prometheus_config
+
+- name: Require an existing validated Prometheus installation
+  ansible.builtin.assert:
+    that:
+      - restaurant_ha_promtool.stat.exists
+      - restaurant_ha_prometheus_config.stat.exists
+      - >-
+        restaurant_ha_prometheus_service + ".service"
+        in ansible_facts.services
+      - >-
+        ansible_facts.services[restaurant_ha_prometheus_service + ".service"].state
+        == "running"
+    fail_msg: >-
+      Prometheus, promtool and the main configuration must already exist.
+      This role does not install an unreviewed monitoring stack.
+
+- name: Create Prometheus file-discovery directory
+  ansible.builtin.file:
+    path: "{{ restaurant_ha_prometheus_file_sd_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create protected monitoring backup directory
+  ansible.builtin.file:
+    path: "{{ restaurant_ha_backup_root }}/prometheus"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Inspect existing Prometheus target file
+  ansible.builtin.stat:
+    path: "{{ restaurant_ha_prometheus_target_path }}"
+  register: restaurant_ha_existing_prometheus_targets
+
+- name: Back up existing Prometheus target file
+  ansible.builtin.copy:
+    src: "{{ restaurant_ha_prometheus_target_path }}"
+    dest: >-
+      {{ restaurant_ha_backup_root }}/prometheus/restaurant-ha.yml.{{
+        ansible_date_time.iso8601_basic_short
+      }}
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0600"
+  when: restaurant_ha_existing_prometheus_targets.stat.exists
+
+- name: Deploy Prometheus file-discovery targets
+  ansible.builtin.template:
+    src: prometheus-targets.yml.j2
+    dest: "{{ restaurant_ha_prometheus_target_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload Prometheus safely

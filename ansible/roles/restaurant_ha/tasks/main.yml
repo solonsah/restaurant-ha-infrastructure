@@ -1,0 +1,53 @@
+---
+- name: Run safety preflight checks
+  ansible.builtin.import_tasks: preflight.yml
+  tags:
+    - always
+    - preflight
+
+- name: Gather read-only infrastructure baseline
+  ansible.builtin.import_tasks: audit.yml
+  tags:
+    - audit
+
+- name: Configure HAProxy load-balancing tier
+  ansible.builtin.import_tasks: haproxy.yml
+  when: restaurant_ha_manage_haproxy | bool
+  tags:
+    - haproxy
+
+- name: Configure Apache HTTPD web tier
+  ansible.builtin.import_tasks: httpd.yml
+  when: restaurant_ha_manage_httpd | bool
+  tags:
+    - httpd
+
+- name: Configure shared NFS client mounts
+  ansible.builtin.import_tasks: nfs.yml
+  when: restaurant_ha_manage_nfs_client | bool
+  tags:
+    - nfs
+
+- name: Configure approved firewalld access
+  ansible.builtin.import_tasks: firewalld.yml
+  when: restaurant_ha_manage_firewalld | bool
+  tags:
+    - firewalld
+
+- name: Configure Prometheus target discovery
+  ansible.builtin.import_tasks: monitoring.yml
+  when: restaurant_ha_manage_monitoring | bool
+  tags:
+    - monitoring
+
+- name: Restore an explicitly selected configuration backup
+  ansible.builtin.import_tasks: rollback.yml
+  when: restaurant_ha_rollback_requested | bool
+  tags:
+    - rollback
+
+- name: Run post-change validation
+  ansible.builtin.import_tasks: validate.yml
+  tags:
+    - always
+    - validate

@@ -1,0 +1,64 @@
+---
+- name: Determine whether this run requests configuration changes
+  ansible.builtin.set_fact:
+    restaurant_ha_change_requested: >-
+      {{
+        restaurant_ha_manage_haproxy
+        or restaurant_ha_manage_httpd
+        or restaurant_ha_manage_nfs_client
+        or restaurant_ha_manage_monitoring
+        or restaurant_ha_manage_firewalld
+        or restaurant_ha_rollback_requested
+      }}
+
+- name: Verify supported operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution in restaurant_ha_supported_distributions
+      - ansible_facts.distribution_major_version in restaurant_ha_supported_major_versions
+    fail_msg: >-
+      This role supports only the documented RHEL major versions.
+      Review and test compatibility before proceeding.
+    success_msg: The target operating system is within the documented support scope.
+
+- name: Verify effective root privileges for requested changes
+  ansible.builtin.assert:
+    that:
+      - not restaurant_ha_change_requested or ansible_facts.user_uid | int == 0
+    fail_msg: Configuration changes require effective root privileges.
+    success_msg: Required privilege level is available.
+
+- name: Enforce change approval gate
+  ansible.builtin.assert:
+    that:
+      - not restaurant_ha_change_requested or restaurant_ha_change_approved | bool
+    fail_msg: Set restaurant_ha_change_approved=true only after formal approval.
+    success_msg: Change approval gate passed.
+
+- name: Enforce recovery-access gate
+  ansible.builtin.assert:
+    that:
+      - not restaurant_ha_change_requested or restaurant_ha_recovery_access_confirmed | bool
+    fail_msg: Confirm independent recovery access before applying configuration changes.
+    success_msg: Recovery-access gate passed.
+
+- name: Prevent deployment and rollback in the same run
+  ansible.builtin.assert:
+    that:
+      - >-
+        not restaurant_ha_rollback_requested
+        or not (
+          restaurant_ha_manage_haproxy
+          or restaurant_ha_manage_httpd
+          or restaurant_ha_manage_nfs_client
+          or restaurant_ha_manage_monitoring
+          or restaurant_ha_manage_firewalld
+        )
+    fail_msg: Configuration deployment and rollback cannot run together.
+
+- name: Enforce backup-confirmation gate
+  ansible.builtin.assert:
+    that:
+      - not restaurant_ha_change_requested or restaurant_ha_backup_confirmed | bool
+    fail_msg: Confirm backups before applying configuration changes.
+    success_msg: Backup-confirmation gate passed.

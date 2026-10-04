@@ -1,0 +1,43 @@
+---
+- name: Validate HAProxy configuration before reload
+  ansible.builtin.command:
+    cmd: >-
+      haproxy -c
+      -f {{ restaurant_ha_haproxy_config_path }}
+  register: restaurant_ha_haproxy_validation
+  changed_when: false
+  listen: Reload HAProxy safely
+
+- name: Reload HAProxy after successful validation
+  ansible.builtin.service:
+    name: "{{ restaurant_ha_haproxy_service }}"
+    state: reloaded
+  listen: Reload HAProxy safely
+
+- name: Validate Apache HTTPD configuration before reload
+  ansible.builtin.command:
+    cmd: httpd -t
+  register: restaurant_ha_httpd_validation
+  changed_when: false
+  listen: Reload HTTPD safely
+
+- name: Reload Apache HTTPD after successful validation
+  ansible.builtin.service:
+    name: "{{ restaurant_ha_httpd_service }}"
+    state: reloaded
+  listen: Reload HTTPD safely
+
+- name: Validate Prometheus configuration before reload
+  ansible.builtin.command:
+    cmd: >-
+      /usr/bin/promtool check config
+      {{ restaurant_ha_prometheus_config_path }}
+  register: restaurant_ha_prometheus_validation
+  changed_when: false
+  listen: Reload Prometheus safely
+
+- name: Reload Prometheus after successful validation
+  ansible.builtin.service:
+    name: "{{ restaurant_ha_prometheus_service }}"
+    state: reloaded
+  listen: Reload Prometheus safely

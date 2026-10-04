@@ -1,0 +1,25 @@
+# Managed by Ansible.
+# This example serves static or externally generated application content.
+# It does not assume PHP, Nginx or embedded database credentials.
+
+<VirtualHost *:{{ restaurant_ha_http_port }}>
+    ServerName {{ restaurant_ha_server_name | default('restaurant.example.invalid') }}
+    DocumentRoot "{{ restaurant_ha_document_root }}"
+
+    <Directory "{{ restaurant_ha_document_root }}">
+        AllowOverride None
+        Options -Indexes +FollowSymLinks
+        Require all granted
+    </Directory>
+
+    <Location "{{ restaurant_ha_health_path }}">
+        Require all granted
+    </Location>
+
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    ErrorLog logs/restaurant-ha-error.log
+    CustomLog logs/restaurant-ha-access.log combined
+</VirtualHost>

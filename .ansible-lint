@@ -1,0 +1,13 @@
+---
+profile: moderate
+
+exclude_paths:
+  - sample-output/
+
+skip_list:
+  # Read-only service and configuration checks may use commands where
+  # no equivalent built-in module provides the required output.
+  - command-instead-of-module
+
+warn_list:
+  - experimental

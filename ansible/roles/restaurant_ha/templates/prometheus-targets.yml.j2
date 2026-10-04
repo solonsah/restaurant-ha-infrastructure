@@ -1,0 +1,13 @@
+---
+# Managed by Ansible.
+# Targets are generated from the sanitized inventory groups.
+
+{% for group_name in ['load_balancers', 'web_servers', 'nfs_servers', 'database_servers'] %}
+- targets:
+{% for host in groups.get(group_name, []) %}
+    - "{{ hostvars[host].ansible_host | default(host) }}:{{ restaurant_ha_node_exporter_port }}"
+{% endfor %}
+  labels:
+    service: restaurant-ha
+    role: "{{ group_name }}"
+{% endfor %}

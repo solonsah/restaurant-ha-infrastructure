@@ -1,0 +1,85 @@
+---
+- name: Gather installed-package facts
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Inspect HAProxy configuration file
+  ansible.builtin.stat:
+    path: "{{ restaurant_ha_haproxy_config_path }}"
+  register: restaurant_ha_haproxy_config
+  when: inventory_hostname in groups.get("load_balancers", [])
+
+- name: Validate existing HAProxy configuration
+  ansible.builtin.command:
+    cmd: >-
+      haproxy -c
+      -f {{ restaurant_ha_haproxy_config_path }}
+  register: restaurant_ha_haproxy_audit
+  changed_when: false
+  failed_when: false
+  when:
+    - inventory_hostname in groups.get("load_balancers", [])
+    - restaurant_ha_haproxy_package in ansible_facts.packages
+    - restaurant_ha_haproxy_config.stat.exists | default(false)
+
+- name: Inspect Apache HTTPD configuration file
+  ansible.builtin.stat:
+    path: "{{ restaurant_ha_httpd_config_path }}"
+  register: restaurant_ha_httpd_config
+  when: inventory_hostname in groups.get("web_servers", [])
+
+- name: Validate existing Apache HTTPD configuration
+  ansible.builtin.command:
+    cmd: httpd -t
+  register: restaurant_ha_httpd_audit
+  changed_when: false
+  failed_when: false
+  when:
+    - inventory_hostname in groups.get("web_servers", [])
+    - restaurant_ha_httpd_package in ansible_facts.packages
+
+- name: Check local HTTP health endpoint
+  ansible.builtin.uri:
+    url: >-
+      http://127.0.0.1:{{ restaurant_ha_http_port }}{{ restaurant_ha_health_path }}
+    method: GET
+    status_code: 200
+    return_content: false
+  register: restaurant_ha_http_health
+  changed_when: false
+  failed_when: false
+  when: inventory_hostname in groups.get("web_servers", [])
+
+- name: Check MariaDB network reachability from web nodes
+  ansible.builtin.wait_for:
+    host: "{{ restaurant_ha_mariadb_host }}"
+    port: "{{ restaurant_ha_mariadb_port }}"
+    state: started
+    timeout: 3
+  register: restaurant_ha_mariadb_reachability
+  changed_when: false
+  failed_when: false
+  when:
+    - inventory_hostname in groups.get("web_servers", [])
+    - restaurant_ha_validate_mariadb | bool
+
+- name: Report sanitized high-availability audit summary
+  ansible.builtin.debug:
+    msg:
+      host_group_membership:
+        load_balancer: "{{ inventory_hostname in groups.get('load_balancers', []) }}"
+        web_server: "{{ inventory_hostname in groups.get('web_servers', []) }}"
+        nfs_server: "{{ inventory_hostname in groups.get('nfs_servers', []) }}"
+        database_server: "{{ inventory_hostname in groups.get('database_servers', []) }}"
+        monitoring_server: "{{ inventory_hostname in groups.get('monitoring_servers', []) }}"
+      haproxy_installed: "{{ restaurant_ha_haproxy_package in ansible_facts.packages }}"
+      httpd_installed: "{{ restaurant_ha_httpd_package in ansible_facts.packages }}"
+      nfs_client_installed: "{{ restaurant_ha_nfs_package in ansible_facts.packages }}"
+      nfs_mount_present: >-
+        {{
+          restaurant_ha_nfs_mount_path
+          in (ansible_facts.mounts | map(attribute='mount') | list)
+        }}

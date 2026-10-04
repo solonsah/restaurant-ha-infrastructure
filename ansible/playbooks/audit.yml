@@ -1,0 +1,17 @@
+---
+- name: Audit restaurant high-availability infrastructure
+  hosts: restaurant_ha
+  gather_facts: true
+  become: true
+  any_errors_fatal: false
+
+  vars:
+    restaurant_ha_manage_haproxy: false
+    restaurant_ha_manage_httpd: false
+    restaurant_ha_manage_nfs_client: false
+    restaurant_ha_manage_firewalld: false
+    restaurant_ha_manage_monitoring: false
+    restaurant_ha_validate_mariadb: true
+
+  roles:
+    - role: restaurant_ha

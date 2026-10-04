@@ -1,0 +1,23 @@
+---
+- name: Roll back one approved restaurant infrastructure component
+  hosts: restaurant_ha
+  gather_facts: true
+  become: true
+  serial: 1
+  any_errors_fatal: true
+  max_fail_percentage: 0
+
+  vars:
+    restaurant_ha_rollback_requested: true
+
+  pre_tasks:
+    - name: Require an explicit single-host rollback limit
+      ansible.builtin.assert:
+        that:
+          - ansible_limit is defined
+          - ansible_limit | length > 0
+          - ansible_limit not in ["all", "restaurant_ha"]
+        fail_msg: Rollback requires an explicit --limit for one approved host.
+
+  roles:
+    - role: restaurant_ha

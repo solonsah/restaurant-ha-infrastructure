@@ -1,0 +1,33 @@
+# Managed by Ansible.
+# Do not place credentials or environment-specific secrets in this file.
+
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    user haproxy
+    group haproxy
+    daemon
+
+defaults
+    log global
+    mode http
+    option httplog
+    option dontlognull
+    option forwardfor
+    timeout connect 5s
+    timeout client 30s
+    timeout server 30s
+    retries 3
+
+frontend restaurant_http
+    bind 0.0.0.0:{{ restaurant_ha_http_port }}
+    http-request set-header X-Forwarded-Proto http
+    default_backend restaurant_web_nodes
+
+backend restaurant_web_nodes
+    balance leastconn
+    option httpchk GET {{ restaurant_ha_health_path }}
+    http-check expect status 200
+{% for host in groups.get('web_servers', []) %}
+    server {{ host }} {{ hostvars[host].ansible_host | default(host) }}:{{ restaurant_ha_http_port }} check
+{% endfor %}

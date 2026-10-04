@@ -1,0 +1,62 @@
+# Environment and secret files
+.env
+.env.*
+!.env.example
+credentials/
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.pub
+
+# Private inventories and host-specific variables
+inventory/private/
+inventory/production/
+inventory/development/
+inventory/test/
+group_vars/
+host_vars/
+!inventory/example.ini
+
+# Ansible-generated files
+*.retry
+ansible.log
+/collections/
+/roles/
+
+# Logs, reports, backups and runtime data
+*.log
+reports/
+backups/
+artifacts/
+runtime/
+tmp/
+temp/
+
+# Database exports and archives
+*.sql
+*.dump
+*.bak
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
+# Monitoring runtime data
+prometheus-data/
+grafana-data/
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

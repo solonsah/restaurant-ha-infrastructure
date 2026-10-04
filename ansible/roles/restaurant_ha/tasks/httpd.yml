@@ -1,0 +1,68 @@
+---
+- name: Confirm HTTPD tasks are running only on web servers
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname in groups.get("web_servers", [])
+    fail_msg: HTTPD management is restricted to the web_servers inventory group.
+
+- name: Install Apache HTTPD package
+  ansible.builtin.package:
+    name: "{{ restaurant_ha_httpd_package }}"
+    state: present
+
+- name: Create protected HTTPD backup directory
+  ansible.builtin.file:
+    path: "{{ restaurant_ha_backup_root }}/httpd"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Inspect existing restaurant HTTPD configuration
+  ansible.builtin.stat:
+    path: "{{ restaurant_ha_httpd_config_path }}"
+  register: restaurant_ha_existing_httpd_config
+
+- name: Back up existing restaurant HTTPD configuration
+  ansible.builtin.copy:
+    src: "{{ restaurant_ha_httpd_config_path }}"
+    dest: >-
+      {{ restaurant_ha_backup_root }}/httpd/restaurant-ha.conf.{{
+        ansible_date_time.iso8601_basic_short
+      }}
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0600"
+  when: restaurant_ha_existing_httpd_config.stat.exists
+
+- name: Create restaurant document root
+  ansible.builtin.file:
+    path: "{{ restaurant_ha_document_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create load-balancer health-check file
+  ansible.builtin.copy:
+    content: "OK\n"
+    dest: "{{ restaurant_ha_document_root }}{{ restaurant_ha_health_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy restaurant HTTPD virtual-host configuration
+  ansible.builtin.template:
+    src: restaurant-ha.conf.j2
+    dest: "{{ restaurant_ha_httpd_config_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload HTTPD safely
+
+- name: Enable and start Apache HTTPD service
+  ansible.builtin.service:
+    name: "{{ restaurant_ha_httpd_service }}"
+    enabled: true
+    state: started

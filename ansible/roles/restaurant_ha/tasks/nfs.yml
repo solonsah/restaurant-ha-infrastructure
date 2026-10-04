@@ -1,0 +1,27 @@
+---
+- name: Confirm NFS client tasks are running only on web servers
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname in groups.get("web_servers", [])
+    fail_msg: Shared-storage mounts are restricted to the web_servers inventory group.
+
+- name: Install NFS client package
+  ansible.builtin.package:
+    name: "{{ restaurant_ha_nfs_package }}"
+    state: present
+
+- name: Create shared-storage mount point
+  ansible.builtin.file:
+    path: "{{ restaurant_ha_nfs_mount_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Persist and mount shared NFS storage
+  ansible.posix.mount:
+    path: "{{ restaurant_ha_nfs_mount_path }}"
+    src: "{{ restaurant_ha_nfs_source }}"
+    fstype: nfs
+    opts: "{{ restaurant_ha_nfs_mount_options }}"
+    state: mounted
